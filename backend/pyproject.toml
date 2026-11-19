@@ -2,4 +2,12 @@
 name = "backend"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "boto3>=1.44.6",
+    "fastapi>=0.165.0",
+    "mangum>=0.22.0",
+    "groq>=1.7.0",
+    "python-dotenv>=1.2.4",
+    "python-multipart>=0.0.34",
+    "uvicorn>=0.54.0",
+]

@@ -1,0 +1,21 @@
+{
+    "full_name": "Rajdeep Patil",
+    "name": "Rajdeep",
+    "current_role": "Founding Engineer",
+    "location": "India",
+    "email": "rajdeepcs@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/rajdeeppatil2021/",
+    "specialties": [
+        "Full-Stack Development & Design Engineering",
+        "AI Engineering, LLM Integrations & Agent Architectures",
+        "Backend Systems & Scalable Software Architecture"
+    ],
+    "years_experience": 2,
+    "education": [
+        {
+            "degree": "Bachelor of Technology (B.Tech) in Biotechnology",
+            "institution": "",
+            "year": "2026"
+        }
+    ]
+}

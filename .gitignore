@@ -4,6 +4,9 @@
 !.env.example
 !*.env.example
 
+lambda-deployment.zip
+lambda-package/
+
 # Python
 __pycache__/
 *.py[cod]

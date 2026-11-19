@@ -1,0 +1,5 @@
+I am a **Founding Engineer and Full-Stack Developer** with nearly 2 years of experience building production-ready web applications and AI-powered products. My expertise includes design engineering, React, Next.js, TypeScript, backend architecture, PostgreSQL, Redis, LLM integrations, RAG systems, and AI agent architectures.
+
+Currently, I'm focused on building intelligent software products, exploring AI architecture and agentic systems, and understanding how to combine thoughtful interface design with scalable backend infrastructure.
+
+My background includes working as the Founding Engineer at Klosr, where I own the technical development of a B2B AI sales platform from the ground up. I've worked across the entire product lifecycle, from database architecture and background processing to interactive frontend experiences, AI-powered outreach, and third-party integrations. I've also independently built and delivered web projects for clients, taking ideas from concept to production.
