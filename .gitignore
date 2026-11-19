@@ -7,6 +7,8 @@
 lambda-deployment.zip
 lambda-package/
 
+.week2/
+
 # Python
 __pycache__/
 *.py[cod]

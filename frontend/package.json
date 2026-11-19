@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "deploy": "next build && aws s3 sync out s3://twin-frontend-651167506335 --delete",
     "lint": "eslint"
   },
   "dependencies": {

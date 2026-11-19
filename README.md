@@ -26,8 +26,27 @@ AI Digital Twin with persistent memory and interactive chat interface.
    uvicorn server:app --reload --port 8000
    ```
 
-### Frontend
-1. Navigate to `frontend`:
+### Deploying Backend to AWS Lambda
+1. Build the deployment package:
+   ```bash
+   cd backend
+   python deploy.py
+   ```
+2. Build and update the deployed AWS Lambda function:
+   ```bash
+   python deploy.py --deploy
+   ```
+
+### Deploying Frontend to AWS S3
+Deploy updates to the live frontend:
+```bash
+cd frontend
+npm run deploy
+```
+
+## Live Deployments
+- **Frontend URL:** [http://twin-frontend-651167506335.s3-website-us-east-1.amazonaws.com](http://twin-frontend-651167506335.s3-website-us-east-1.amazonaws.com)
+- **Backend API (Lambda URL):** `https://m22svnukhz3dxakgk2cybjrygq0wajps.lambda-url.us-east-1.on.aws/`
    ```bash
    cd frontend
    ```
