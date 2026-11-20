@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from groq import Groq
 import os
@@ -49,6 +50,7 @@ if USE_S3:
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
+    stream: Optional[bool] = False
 
 
 class ChatResponse(BaseModel):
@@ -117,7 +119,58 @@ async def health_check():
     return {"status": "healthy", "use_s3": USE_S3}
 
 
-@app.post("/chat", response_model=ChatResponse)
+def generate_chat_stream(
+    request: ChatRequest,
+    session_id: str,
+    conversation: List[Dict],
+    messages: List[Dict],
+):
+    def event_stream():
+        yield f"data: {json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
+        collected_text = []
+        try:
+            stream = client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=messages,
+                stream=True,
+            )
+            for chunk in stream:
+                if chunk.choices and len(chunk.choices) > 0:
+                    delta = chunk.choices[0].delta.content or ""
+                    if delta:
+                        collected_text.append(delta)
+                        yield f"data: {json.dumps({'type': 'content', 'delta': delta})}\n\n"
+        except Exception as err:
+            print(f"Error during streaming completion: {err}")
+            yield f"data: {json.dumps({'type': 'error', 'error': str(err)})}\n\n"
+            return
+
+        full_response = "".join(collected_text)
+        conversation.append(
+            {"role": "user", "content": request.message, "timestamp": datetime.now().isoformat()}
+        )
+        conversation.append(
+            {
+                "role": "assistant",
+                "content": full_response,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
+        save_conversation(session_id, conversation)
+        yield f"data: {json.dumps({'type': 'done', 'session_id': session_id})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.post("/chat")
 async def chat(request: ChatRequest):
     try:
         # Generate session ID if not provided
@@ -135,6 +188,9 @@ async def chat(request: ChatRequest):
 
         # Add current user message
         messages.append({"role": "user", "content": request.message})
+
+        if request.stream:
+            return generate_chat_stream(request, session_id, conversation, messages)
 
         # Call Groq API
         response = client.chat.completions.create(
@@ -163,6 +219,23 @@ async def chat(request: ChatRequest):
 
     except Exception as e:
         print(f"Error in chat endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/chat/stream")
+async def chat_stream(request: ChatRequest):
+    try:
+        session_id = request.session_id or str(uuid.uuid4())
+        conversation = load_conversation(session_id)
+
+        messages = [{"role": "system", "content": prompt()}]
+        for msg in conversation[-10:]:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        messages.append({"role": "user", "content": request.message})
+
+        return generate_chat_stream(request, session_id, conversation, messages)
+    except Exception as e:
+        print(f"Error in chat_stream endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

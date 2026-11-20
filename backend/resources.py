@@ -21,3 +21,10 @@ with open(DATA_DIR / "style.txt", "r", encoding="utf-8") as f:
 
 with open(DATA_DIR / "facts.json", "r", encoding="utf-8") as f:
     facts = json.load(f)
+
+# Read personality and personal context notes
+try:
+    with open(DATA_DIR / "me.txt", "r", encoding="utf-8") as f:
+        me = f.read()
+except FileNotFoundError:
+    me = ""
