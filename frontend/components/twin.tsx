@@ -8,9 +8,8 @@ import {
   Copy,
   Check,
   ArrowDown,
-  Sparkles,
 } from 'lucide-react';
-import Icon from '@/public/Icon';
+import Avatar from '@/public/avatar';
 
 interface Message {
   id: string;
@@ -124,7 +123,7 @@ function renderInlineText(text: string, isStreamingAtEnd?: boolean) {
         parts.push(
           <code
             key={`c-${keyIdx++}`}
-            className="px-1.5 py-0.5 mx-0.5 rounded bg-zinc-800/80 text-zinc-200 border border-zinc-750 font-mono text-xs"
+            className="px-1.5 py-0.5 mx-0.5 rounded bg-zinc-800/80 text-zinc-200 border border-zinc-700/80 font-mono text-xs"
           >
             {remaining.slice(1, end)}
           </code>
@@ -383,12 +382,19 @@ export default function Twin() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [isNearBottom, setIsNearBottom] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const focusInput = useCallback(() => {
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  }, []);
 
   // Fluid typing stream refs
   const targetTextRef = useRef('');
@@ -468,6 +474,7 @@ export default function Twin() {
         animFrameRef.current = null;
         setIsGenerating(false);
         setIsThinking(false);
+        setActiveMessageId(null);
         activeMessageIdRef.current = null;
         if (shouldAutoScrollRef.current) {
           scrollToBottom(true);
@@ -478,17 +485,26 @@ export default function Twin() {
     animFrameRef.current = requestAnimationFrame(tick);
   }, [scrollToBottom]);
 
-  // Clean up RAF on unmount
+  // Auto-focus input on mount and clean up RAF on unmount
   useEffect(() => {
+    focusInput();
     return () => {
       if (animFrameRef.current !== null) {
         cancelAnimationFrame(animFrameRef.current);
       }
       abortControllerRef.current?.abort();
     };
-  }, []);
+  }, [focusInput]);
 
-  const stopGeneration = () => {
+  // Auto-resize textarea height to fit content
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 144)}px`;
+  }, [input]);
+
+  const stopGeneration = useCallback(() => {
     if (!isGenerating) return;
     abortControllerRef.current?.abort();
     streamDoneRef.current = true;
@@ -498,7 +514,22 @@ export default function Twin() {
     );
     setIsGenerating(false);
     setIsThinking(false);
-  };
+    setActiveMessageId(null);
+    focusInput();
+  }, [isGenerating, focusInput]);
+
+  // Allow Escape key to stop streaming generation
+  useEffect(() => {
+    if (!isGenerating) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        stopGeneration();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isGenerating, stopGeneration]);
 
   const copyMessageContent = async (id: string, text: string) => {
     try {
@@ -514,8 +545,9 @@ export default function Twin() {
     const text = (overrideText ?? input).trim();
     if (!text || isGenerating) return;
 
-    // Reset input
+    // Reset input and keep focus ready for next message
     if (!overrideText) setInput('');
+    focusInput();
 
     const userMessage: Message = {
       id: generateId(),
@@ -537,6 +569,7 @@ export default function Twin() {
     // Reset fluid buffer refs
     targetTextRef.current = '';
     displayedLengthRef.current = 0;
+    setActiveMessageId(assistantId);
     activeMessageIdRef.current = assistantId;
     streamDoneRef.current = false;
     shouldAutoScrollRef.current = true;
@@ -691,10 +724,12 @@ export default function Twin() {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      if (!isGenerating) {
+        sendMessage();
+      }
     }
   };
 
@@ -707,52 +742,37 @@ export default function Twin() {
     setInput('');
     targetTextRef.current = '';
     displayedLengthRef.current = 0;
+    setActiveMessageId(null);
     activeMessageIdRef.current = null;
-    inputRef.current?.focus();
+    focusInput();
   };
 
   return (
     <div className="flex flex-col h-full w-full bg-zinc-950 text-zinc-100 select-text">
-      {/* Clean & Professional Header */}
-      <header className="shrink-0 z-10 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md px-4 sm:px-8 py-3.5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center w-9 h-9 rounded-full bg-zinc-900 border border-zinc-700/80 shrink-0">
-            <Icon size={36} />
-            <span
-              className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-zinc-950 transition-colors ${
-                isGenerating ? 'bg-emerald-400 animate-pulse' : 'bg-emerald-500'
-              }`}
-            />
+      {/* Minimal Header */}
+      <header className="shrink-0 z-10 border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-md px-4 sm:px-8 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 shrink-0 overflow-hidden">
+            <Avatar size={26} interactive={false} toggleThemeOnClick={false} />
           </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-semibold text-zinc-100 tracking-tight">
-                Rajdeep Patil
-              </h1>
-              <span className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
-                AI Twin
-              </span>
-            </div>
-            <p className="text-xs text-zinc-400">
-              {isGenerating ? (
-                <span className="text-emerald-400 font-medium animate-pulse">
-                  Streaming response...
-                </span>
-              ) : (
-                'Online · Ask anything about my work & background'
-              )}
-            </p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-sm font-semibold text-zinc-100 tracking-tight">
+              Rajdeep Patil
+            </h1>
+            <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400">
+              AI Twin
+            </span>
           </div>
         </div>
 
         {messages.length > 0 && (
           <button
             onClick={resetChat}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 transition-colors"
             title="Start new conversation"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">New Chat</span>
+            <span className="hidden sm:inline">New chat</span>
           </button>
         )}
       </header>
@@ -766,16 +786,15 @@ export default function Twin() {
         <div className="w-full max-w-3xl mx-auto flex-1 flex flex-col justify-start">
           {messages.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center py-12 px-2 max-w-xl mx-auto animate-in fade-in duration-300">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 text-zinc-300 shadow-inner">
-                <Icon size={64} />
+              <div className="w-16 h-16 rounded-2xl bg-zinc-900/80 border border-zinc-800/80 flex items-center justify-center mb-5 shadow-sm overflow-hidden">
+                <Avatar size={56} toggleThemeOnClick={false} />
               </div>
 
               <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-100 mb-2">
                 Ask me anything about my work
               </h2>
-              <p className="text-sm text-zinc-400 leading-relaxed mb-8 max-w-md">
-                This is my verified AI twin. Feel free to ask about my engineering
-                experience, projects, architecture, and technical stack.
+              <p className="text-sm text-zinc-400 mb-8 max-w-md">
+                Engineering experience, projects, architecture, and technical stack.
               </p>
 
               <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left">
@@ -784,9 +803,9 @@ export default function Twin() {
                     key={question}
                     onClick={() => sendMessage(question)}
                     disabled={isGenerating}
-                    className="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900 text-xs sm:text-sm text-zinc-300 hover:text-zinc-100 transition-all text-left flex items-start justify-between group disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-3.5 rounded-xl bg-zinc-900/50 border border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900 text-xs sm:text-sm text-zinc-300 hover:text-zinc-100 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <span>{question}</span>
+                    {question}
                   </button>
                 ))}
               </div>
@@ -795,10 +814,10 @@ export default function Twin() {
             <div className="space-y-6 pb-4">
               {messages.map((message) => {
                 const isStreamingMessage =
-                  isGenerating && message.id === activeMessageIdRef.current;
+                  isGenerating && message.id === activeMessageId;
                 const isCurrentThinking =
                   isThinking &&
-                  message.id === activeMessageIdRef.current &&
+                  message.id === activeMessageId &&
                   message.content.length === 0;
 
                 // Don't render empty unthinking assistant bubble
@@ -813,21 +832,21 @@ export default function Twin() {
                 return (
                   <div
                     key={message.id}
-                    className={`flex gap-3.5 ${
+                    className={`flex gap-3 ${
                       message.role === 'user' ? 'justify-end' : 'justify-start'
                     } group`}
                   >
                     {message.role === 'assistant' && (
-                      <div className="w-7 h-7 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 mt-0.5 overflow-hidden shadow-sm">
-                        <Icon size={20} />
+                      <div className="w-7 h-7 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 mt-0.5 overflow-hidden">
+                        <Avatar size={20} interactive={false} toggleThemeOnClick={false} />
                       </div>
                     )}
 
                     <div
-                      className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed transition-all ${
+                      className={`max-w-[85%] sm:max-w-[80%] text-sm leading-relaxed ${
                         message.role === 'user'
-                          ? 'bg-zinc-100 text-zinc-950 font-medium rounded-tr-sm shadow-sm'
-                          : 'bg-zinc-900/90 border border-zinc-800/80 text-zinc-200 rounded-tl-sm shadow-sm'
+                          ? 'bg-zinc-100 text-zinc-950 font-medium rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm'
+                          : 'bg-zinc-900/80 border border-zinc-800/80 text-zinc-200 rounded-2xl rounded-tl-sm px-4 py-3 relative'
                       }`}
                     >
                       {message.role === 'user' ? (
@@ -835,15 +854,9 @@ export default function Twin() {
                       ) : (
                         <div>
                           {isCurrentThinking ? (
-                            <div className="flex items-center gap-2.5 py-1 text-xs text-zinc-400">
-                              <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                              </span>
-                              <span className="animate-pulse font-medium text-zinc-300">
-                                Rajdeep is thinking...
-                              </span>
-                            </div>
+                            <span className="text-xs text-zinc-400 animate-pulse">
+                              Thinking...
+                            </span>
                           ) : (
                             <FormattedMessage
                               content={message.content}
@@ -853,29 +866,19 @@ export default function Twin() {
                         </div>
                       )}
 
-                      {/* Footer: Timestamp and Message Copy Button */}
-                      <div
-                        className={`text-[10px] mt-2 font-normal flex items-center justify-between gap-3 ${
-                          message.role === 'user'
-                            ? 'text-zinc-500 text-right'
-                            : 'text-zinc-500'
-                        }`}
-                      >
-                        <span>
-                          {message.timestamp.toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-
-                        {message.role === 'assistant' &&
-                          message.content.length > 0 &&
-                          !isStreamingMessage && (
+                      {message.role === 'assistant' &&
+                        message.content.length > 0 &&
+                        !isStreamingMessage && (
+                          <div className="mt-2 flex justify-end">
                             <button
                               onClick={() =>
                                 copyMessageContent(message.id, message.content)
                               }
-                              className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 hover:text-zinc-300 p-0.5"
+                              className={`transition-opacity flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 focus-visible:opacity-100 ${
+                                copiedMessageId === message.id
+                                  ? 'opacity-100'
+                                  : 'opacity-0 group-hover:opacity-100'
+                              }`}
                               title="Copy answer"
                             >
                               {copiedMessageId === message.id ? (
@@ -890,8 +893,8 @@ export default function Twin() {
                                 </>
                               )}
                             </button>
-                          )}
-                      </div>
+                          </div>
+                        )}
                     </div>
                   </div>
                 );
@@ -907,7 +910,7 @@ export default function Twin() {
           <div className="sticky bottom-2 left-0 right-0 flex justify-center pointer-events-none">
             <button
               onClick={() => scrollToBottom(true)}
-              className="pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-800/95 hover:bg-zinc-700 text-xs text-zinc-200 border border-zinc-700 shadow-xl backdrop-blur transition-all"
+              className="pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-800/95 hover:bg-zinc-700 text-xs text-zinc-200 border border-zinc-700 shadow-lg backdrop-blur transition-all"
             >
               <ArrowDown className="w-3.5 h-3.5" />
               <span>Jump to latest</span>
@@ -916,19 +919,21 @@ export default function Twin() {
         )}
       </main>
 
-      {/* Input Bar */}
-      <footer className="shrink-0 border-t border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md px-4 sm:px-6 py-4">
+      {/* Minimal Input Bar */}
+      <footer className="shrink-0 bg-zinc-950/90 backdrop-blur-md px-4 sm:px-6 pb-5 pt-2">
         <div className="w-full max-w-3xl mx-auto">
-          <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 focus-within:border-zinc-600 rounded-2xl px-4 py-2 transition-colors shadow-sm">
-            <input
+          <div
+            onClick={() => inputRef.current?.focus()}
+            className="flex items-end gap-2 bg-zinc-900/90 border border-zinc-800 focus-within:border-zinc-600/80 rounded-2xl px-4 py-2.5 transition-colors shadow-sm cursor-text"
+          >
+            <textarea
               ref={inputRef}
-              type="text"
+              rows={1}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask anything about Rajdeep..."
-              className="flex-1 bg-transparent text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none"
-              disabled={isGenerating}
+              className="flex-1 bg-transparent text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none resize-none leading-6 max-h-36 py-0.5"
             />
 
             {isGenerating ? (
@@ -951,10 +956,6 @@ export default function Twin() {
               </button>
             )}
           </div>
-          <p className="text-[11px] text-center text-zinc-500 mt-2">
-            Responses are streamed in real time by AI representing Rajdeep Patil
-            based on actual projects and experience.
-          </p>
         </div>
       </footer>
     </div>
