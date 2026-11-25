@@ -17,10 +17,10 @@ export const metadata: Metadata = {
   description: "Interactive AI Twin of Rajdeep Patil. Inquire about background, technical skills, architecture, and projects.",
   icons: {
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "any" },
+      { url: "/twin/icon.svg", type: "image/svg+xml" },
+      { url: "/twin/favicon.ico", sizes: "any" },
     ],
-    apple: "/apple-touch-icon.png",
+    apple: "/twin/apple-touch-icon.png",
   },
 };
 
